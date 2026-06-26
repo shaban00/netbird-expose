@@ -63,6 +63,7 @@ jobs:
 | `password`        | no       | `''`                 | Pass from a **secret**.                                                               |
 | `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                  |
 | `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                             |
+| `allow-ssh`       | no       | `false`              | Enable NetBird SSH access to the runner.                                              |
 
 ## NetBird side setup
 
