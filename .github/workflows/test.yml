@@ -1,0 +1,64 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh
+
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Gate on secret
+        id: gate
+        env:
+          NETBIRD_SETUP_KEY: ${{ secrets.NETBIRD_SETUP_KEY }}
+        run: |
+          if [ -n "$NETBIRD_SETUP_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No NETBIRD_SETUP_KEY set; skipping the live expose test."
+          fi
+
+      - name: Create a throwaway service to expose
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          cat > Dockerfile <<'DOCKER'
+          FROM nginx:alpine
+          DOCKER
+
+      - name: NetBird Connect
+        if: steps.gate.outputs.run == 'true'
+        uses: shaban00/netbird-connect@v1.0.0
+        with:
+          setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
+          management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
+          hostname: github-runner-${{ github.run_id }}
+
+      - name: NetBird Expose
+        id: expose
+        if: steps.gate.outputs.run == 'true'
+        uses: ./
+        with:
+          port: '8080'
+          protocol: http
+          expose-duration: '60'

@@ -1,0 +1,66 @@
+name: 'NetBird Expose Runner'
+description: "Expose your application through the NetBird reverse proxy"
+author: 'Shaban Mohammedsaani Hassan (shaban00)'
+
+branding:
+  icon: 'globe'
+  color: 'orange'
+
+inputs:
+  dockerfile:
+    description: 'Path to the Dockerfile used to build the service. Ignored when a compose file is present.'
+    required: false
+    default: 'Dockerfile'
+  docker-compose:
+    description: 'Path to the docker-compose file. Takes precedence over the Dockerfile when this file exists.'
+    required: false
+    default: 'docker-compose.yml'
+  port:
+    description: 'Local port the service listens on (the target port to expose).'
+    required: true
+  protocol:
+    description: 'Protocol to expose the service over: http | https | tcp | udp | tls.'
+    required: false
+    default: 'http'
+  expose-duration:
+    description: 'How long the service stays exposed, in seconds, before it is automatically torn down.'
+    required: false
+    default: '300'
+  custom-domain:
+    description: 'Custom domain for the exposed service. Must already be configured and verified on your account.'
+    required: false
+  external-port:
+    description: 'Public-facing external port on the proxy cluster for L4 services. Auto-assigned on shared cloud clusters.'
+    required: false
+  name-prefix:
+    description: 'Readable prefix for the generated service subdomain.'
+    required: false
+  password:
+    description: 'Password-protect the exposed service.'
+    required: false
+  pin:
+    description: 'Protect the exposed service with a 6-digit PIN.'
+    required: false
+  user-groups:
+    description: 'Restrict access to specific SSO user groups, comma-separated.'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Expose service on NetBird
+      id: expose
+      shell: bash
+      env:
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        DOCKER_COMPOSE: ${{ inputs.docker-compose }}
+        PORT: ${{ inputs.port }}
+        PROTOCOL: ${{ inputs.protocol }}
+        EXPOSE_DURATION: ${{ inputs.expose-duration }}
+        CUSTOM_DOMAIN: ${{ inputs.custom-domain }}
+        EXTERNAL_PORT: ${{ inputs.external-port }}
+        NAME_PREFIX: ${{ inputs.name-prefix }}
+        PASSWORD: ${{ inputs.password }}
+        PIN: ${{ inputs.pin }}
+        USER_GROUPS: ${{ inputs.user-groups }}
+      run: bash "${{ github.action_path }}/scripts/expose.sh"
