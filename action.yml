@@ -44,6 +44,10 @@ inputs:
   user-groups:
     description: 'Restrict access to specific SSO user groups, comma-separated.'
     required: false
+  allow-ssh:
+    description: 'Enable NetBird SSH access to the runner before exposing. Starts the embedded SSH server with root and no SSH-layer auth, so access is gated only by your NetBird policy. Default false.'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -63,4 +67,5 @@ runs:
         PASSWORD: ${{ inputs.password }}
         PIN: ${{ inputs.pin }}
         USER_GROUPS: ${{ inputs.user-groups }}
+        ALLOW_SSH: ${{ inputs.allow-ssh }}
       run: bash "${{ github.action_path }}/scripts/expose.sh"

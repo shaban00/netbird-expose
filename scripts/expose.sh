@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#
 # Build the project's Docker service on the runner, publish it to the public internet via the NetBird reverse proxy (netbird expose).
 set -euo pipefail
 
@@ -14,6 +13,7 @@ NAME_PREFIX="${NAME_PREFIX:-}"
 PASSWORD="${PASSWORD:-}"
 PIN="${PIN:-}"
 USER_GROUPS="${USER_GROUPS:-}"
+ALLOW_SSH="${ALLOW_SSH:-false}"
 
 if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
   echo "error: PORT must be numeric (got '${PORT}')" >&2
@@ -35,7 +35,7 @@ if [ "$(id -u)" -ne 0 ]; then
   SUDO=(sudo)
 fi
 
-# --- the runner must already be on the mesh (netbird-connect ran) -------------
+# --- the runner must already be on the mesh (netbird-connect ran) ---
 if ! "${SUDO[@]}" netbird status >/dev/null 2>&1; then
   echo "error: netbird service is not running on the runner." >&2
   echo "       Start the daemon (e.g. 'netbird service start') and run shaban00/netbird-connect first." >&2
@@ -76,6 +76,12 @@ if [ -f "${DOCKER_COMPOSE}" ]; then
   start_with_docker_compose
 else
   start_with_dockerfile
+fi
+
+# --- optionally enable the NetBird SSH server on the runner ---
+if [ "${ALLOW_SSH}" = "true" ]; then
+  echo "== Enabling NetBird SSH access on the runner =="
+  "${SUDO[@]}" netbird down && "${SUDO[@]}" netbird up --allow-server-ssh --enable-ssh-local-port-forwarding --enable-ssh-remote-port-forwarding --enable-ssh-sftp --enable-ssh-root --network-monitor=true --disable-ssh-auth
 fi
 
 expose_args=(--protocol "${PROTOCOL}")
