@@ -27,7 +27,7 @@ jobs:
 
       - name: NetBird Expose
         id: expose
-        uses: shaban00/netbird-expose@v1.0.0
+        uses: shaban00/netbird-expose@v1.0.1
         with:
           port: "8080"
           expose-duration: "300"
