@@ -19,20 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
       - name: NetBird Connect
-        uses: shaban00/netbird-connect@v1.0.0
+        uses: shaban00/netbird-connect@v1.0.1
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
-          hostname: gh-runner-${{ github.event.repository.name }}
 
       - name: NetBird Expose
-        id: expose
         uses: shaban00/netbird-expose@v1.0.4
         with:
           port: "8080"
-          app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format
           expose-duration: "30m"
-          pin: ${{ secrets.EXPOSE_PIN }}
+          app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format   
 ```
 
 ## How it works
