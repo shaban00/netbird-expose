@@ -23,7 +23,7 @@ jobs:
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
-          hostname: github-runner-${{ github.event.repository.name }}
+          hostname: gh-runner-${{ github.event.repository.name }}
 
       - name: NetBird Expose
         id: expose
