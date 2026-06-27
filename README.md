@@ -71,3 +71,29 @@ jobs:
 
 1. **Settings → Clients → Enable Peer Expose**: enable it, and add this runner's group to the allowed groups.
 2. For a **custom domain**, configure and verify it on the account first (Reverse Proxy → Custom Domains).
+
+
+### Passing environment variables (`app-env`)
+
+`.env` files usually aren't committed, so `app-env` lets you hand the action your environment as a secret. Pass a multiline `KEY=VALUE` string (`.env` format, `#` lines ignored)
+
+```yaml
+- uses: shaban00/netbird-expose@v1.0.3
+  with:
+    port: '3001'
+    app-env: ${{ secrets.APP_ENV }}
+```
+
+**Docker Compose: your services must opt in with `env_file: .env`.** The action writes the `.env` next to your compose file, but compose's auto-loaded `.env`
+
+```yaml
+services:
+  mysql:
+    image: mariadb:lts
+    env_file: .env          # <-- required for the vars to reach the container
+    # ...
+  app:
+    image: louislam/uptime-kuma:2
+    env_file: .env
+    # ...
+```
