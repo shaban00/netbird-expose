@@ -15,6 +15,9 @@ inputs:
     description: 'Path to the docker-compose file. Takes precedence over the Dockerfile when this file exists.'
     required: false
     default: 'docker-compose.yml'
+  app-env:
+    description: 'Environment variables to inject into the service as KEY=VALUE pairs, one per line (.env format; lines starting with # are ignored).'
+    required: false
   port:
     description: 'Local port the service listens on (the target port to expose).'
     required: true
@@ -58,6 +61,7 @@ runs:
       env:
         DOCKERFILE: ${{ inputs.dockerfile }}
         DOCKER_COMPOSE: ${{ inputs.docker-compose }}
+        APP_ENV: ${{ inputs.app-env }}
         PORT: ${{ inputs.port }}
         PROTOCOL: ${{ inputs.protocol }}
         EXPOSE_DURATION: ${{ inputs.expose-duration }}
