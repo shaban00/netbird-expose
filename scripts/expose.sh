@@ -6,6 +6,7 @@ PORT="${PORT:?PORT is required}"
 PROTOCOL="${PROTOCOL:-http}"
 DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose.yml}"
+APP_ENV="${APP_ENV:-}"
 EXPOSE_DURATION="${EXPOSE_DURATION:-300}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-}"
 EXTERNAL_PORT="${EXTERNAL_PORT:-}"
@@ -48,6 +49,39 @@ if ! "${SUDO[@]}" netbird status 2>/dev/null | grep -qiE 'Management.*Connected'
   exit 1
 fi
 
+# --- turn APP_ENV (KEY=VALUE per line, # comments) into a .env file ---
+format_env() {
+  local dest="$1" line count=0
+  : > "${dest}"
+  chmod 600 "${dest}" 2>/dev/null || true
+  while IFS= read -r line || [ -n "${line}" ]; do
+    line="${line%$'\r'}"                       # strip CR from CRLF input
+    line="${line#"${line%%[![:space:]]*}"}"    # left-trim whitespace
+    [ -z "${line}" ] && continue               # skip blank lines
+    case "${line}" in '#'*) continue ;; esac   # skip comments
+    if ! printf '%s' "${line}" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*='; then
+      echo "warning: skipping an app-env line without a valid KEY= prefix" >&2
+      continue
+    fi
+    printf '%s\n' "${line}" >> "${dest}"
+    count=$(( count + 1 ))
+  done <<< "${APP_ENV}"
+  echo "${count}"
+}
+
+# Set the global ENV_ARGS to (--env-file <path>) from APP_ENV, or leave it empty when APP_ENV is unset.
+ENV_ARGS=()
+prepare_env_file() {
+  ENV_ARGS=()
+  [ -n "${APP_ENV}" ] || return 0
+  local dest="${1:-}"
+  [ -n "${dest}" ] || dest="$(mktemp /tmp/app-env.XXXXXX)"
+  local n
+  n="$(format_env "${dest}")"
+  echo "Injected ${n} env var(s) via ${dest}"
+  ENV_ARGS=(--env-file "${dest}")
+}
+
 start_with_docker_compose() {
   local dc=()
   if docker compose version >/dev/null 2>&1; then
@@ -58,7 +92,10 @@ start_with_docker_compose() {
     echo "error: no docker compose available on the runner." >&2
     exit 1
   fi
-  "${dc[@]}" -f "${DOCKER_COMPOSE}" up -d --build
+  
+  prepare_env_file "$(dirname "${DOCKER_COMPOSE}")/.env"
+
+  "${dc[@]}" "${ENV_ARGS[@]}" -f "${COMPOSE_FILE}" up -d --build
 }
 
 start_with_dockerfile() {
@@ -69,7 +106,10 @@ start_with_dockerfile() {
   local image="netbird-expose"
   docker build -f "${DOCKERFILE}" -t "${image}" .
   docker rm -f netbird-expose >/dev/null 2>&1 || true
-  docker run -d --name netbird-expose -p "${PORT}:${PORT}" "${image}"
+  
+  prepare_env_file
+
+  docker run -d --name netbird-expose "${ENV_ARGS[@]}" -p "${PORT}:${PORT}" "${image}"
 }
 
 if [ -f "${DOCKER_COMPOSE}" ]; then

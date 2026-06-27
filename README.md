@@ -30,6 +30,7 @@ jobs:
         uses: shaban00/netbird-expose@v1.0.1
         with:
           port: "8080"
+          app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format
           expose-duration: "300"
           pin: ${{ secrets.EXPOSE_PIN }}
 ```
@@ -50,20 +51,21 @@ jobs:
 
 ## Inputs
 
-| Input             | Required | Default              | Description                                                                           |
-| ----------------- | -------- | -------------------- | ------------------------------------------------------------------------------------- |
-| `port`            | yes      | —                    | Local port the service listens on (the target port to expose).                        |
-| `protocol`        | no       | `http`               | One of `http`, `https`, `tcp`, `udp`, `tls`.                                          |
-| `dockerfile`      | no       | `Dockerfile`         | Dockerfile path. Ignored when a compose file is present.                              |
-| `docker-compose`  | no       | `docker-compose.yml` | Compose file path. Takes precedence over the Dockerfile when this file exists.        |
-| `expose-duration` | no       | `300`                | How long the service stays exposed, in seconds, before it is automatically torn down. |
-| `custom-domain`   | no       | `''`                 | Must already be configured and verified on your account.                              |
-| `external-port`   | no       | `''`                 | L4 public port on the proxy; auto-assigned on cloud.                                  |
-| `name-prefix`     | no       | `''`                 | Readable prefix for the generated subdomain.                                          |
-| `password`        | no       | `''`                 | Pass from a **secret**.                                                               |
-| `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                  |
-| `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                             |
-| `allow-ssh`       | no       | `false`              | Enable NetBird SSH access to the runner.                                              |
+| Input             | Required | Default              | Description                                                                                        |
+| ----------------- | -------- | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `port`            | yes      | —                    | Local port the service listens on (the target port to expose).                                     |
+| `protocol`        | no       | `http`               | One of `http`, `https`, `tcp`, `udp`, `tls`.                                                       |
+| `dockerfile`      | no       | `Dockerfile`         | Dockerfile path. Ignored when a compose file is present.                                           |
+| `docker-compose`  | no       | `docker-compose.yml` | Compose file path. Takes precedence over the Dockerfile when this file exists.                     |
+| `app-env`         | no       | `''`                 | Env vars to inject into the service, `KEY=VALUE` per line (`.env` format). Pass from a **secret**. |
+| `expose-duration` | no       | `300`                | How long the service stays exposed, in seconds, before it is automatically torn down.              |
+| `custom-domain`   | no       | `''`                 | Must already be configured and verified on your account.                                           |
+| `external-port`   | no       | `''`                 | L4 public port on the proxy; auto-assigned on cloud.                                               |
+| `name-prefix`     | no       | `''`                 | Readable prefix for the generated subdomain.                                                       |
+| `password`        | no       | `''`                 | Pass from a **secret**.                                                                            |
+| `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                               |
+| `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                                          |
+| `allow-ssh`       | no       | `false`              | Enable NetBird SSH access to the runner.                                                           |
 
 ## NetBird side setup
 
