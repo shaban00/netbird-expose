@@ -7,7 +7,7 @@ PROTOCOL="${PROTOCOL:-http}"
 DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose.yml}"
 APP_ENV="${APP_ENV:-}"
-EXPOSE_DURATION="${EXPOSE_DURATION:-300}"
+EXPOSE_DURATION="${EXPOSE_DURATION:-5m}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-}"
 EXTERNAL_PORT="${EXTERNAL_PORT:-}"
 NAME_PREFIX="${NAME_PREFIX:-}"
@@ -153,4 +153,24 @@ if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
   exit 1
 fi
 
-sleep "${EXPOSE_DURATION}"
+# Convert a duration like 30s / 10m / 1h / 5d (or a bare number = seconds) to seconds.
+to_seconds() {
+  local input="$1" num unit
+  if [[ "${input}" =~ ^([0-9]+)([smhd]?)$ ]]; then
+    num="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]:-s}"
+    case "${unit}" in
+      s) echo "$(( num ))" ;;
+      m) echo "$(( num * 60 ))" ;;
+      h) echo "$(( num * 3600 ))" ;;
+      d) echo "$(( num * 86400 ))" ;;
+    esac
+  else
+    echo "error: EXPOSE_DURATION must be a number optionally suffixed with s/m/h/d (got '${input}')" >&2
+    exit 1
+  fi
+}
+
+EXPOSE_SECONDS="$(to_seconds "${EXPOSE_DURATION}")"
+
+sleep "${EXPOSE_SECONDS}"
