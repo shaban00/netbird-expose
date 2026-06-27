@@ -26,9 +26,9 @@ inputs:
     required: false
     default: 'http'
   expose-duration:
-    description: 'How long the service stays exposed, in seconds, before it is automatically torn down.'
+    description: 'How long to keep the service exposed before automatic teardown. Accepts a number of seconds (e.g. 120) or a value suffixed with s/m/h/d (e.g. 30s, 10m, 1h, 5d).'
     required: false
-    default: '300'
+    default: '5m'
   custom-domain:
     description: 'Custom domain for the exposed service. Must already be configured and verified on your account.'
     required: false
@@ -55,8 +55,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Expose service on NetBird
-      id: expose
+    - name: Expose
       shell: bash
       env:
         DOCKERFILE: ${{ inputs.dockerfile }}

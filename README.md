@@ -23,15 +23,15 @@ jobs:
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
-          hostname: github-runner-${{ github.event.repository.name }}
+          hostname: gh-runner-${{ github.event.repository.name }}
 
       - name: NetBird Expose
         id: expose
-        uses: shaban00/netbird-expose@v1.0.1
+        uses: shaban00/netbird-expose@v1.0.4
         with:
           port: "8080"
           app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format
-          expose-duration: "300"
+          expose-duration: "30m"
           pin: ${{ secrets.EXPOSE_PIN }}
 ```
 
@@ -58,7 +58,7 @@ jobs:
 | `dockerfile`      | no       | `Dockerfile`         | Dockerfile path. Ignored when a compose file is present.                                           |
 | `docker-compose`  | no       | `docker-compose.yml` | Compose file path. Takes precedence over the Dockerfile when this file exists.                     |
 | `app-env`         | no       | `''`                 | Env vars to inject into the service, `KEY=VALUE` per line (`.env` format). Pass from a **secret**. |
-| `expose-duration` | no       | `300`                | How long the service stays exposed, in seconds, before it is automatically torn down.              |
+| `expose-duration` | no       | `5m`                 | How long the service stays exposed, before it is automatically torn down.                          |
 | `custom-domain`   | no       | `''`                 | Must already be configured and verified on your account.                                           |
 | `external-port`   | no       | `''`                 | L4 public port on the proxy; auto-assigned on cloud.                                               |
 | `name-prefix`     | no       | `''`                 | Readable prefix for the generated subdomain.                                                       |
@@ -72,7 +72,6 @@ jobs:
 1. **Settings → Clients → Enable Peer Expose**: enable it, and add this runner's group to the allowed groups.
 2. For a **custom domain**, configure and verify it on the account first (Reverse Proxy → Custom Domains).
 
-
 ### Passing environment variables (`app-env`)
 
 `.env` files usually aren't committed, so `app-env` lets you hand the action your environment as a secret. Pass a multiline `KEY=VALUE` string (`.env` format, `#` lines ignored)
@@ -80,7 +79,7 @@ jobs:
 ```yaml
 - uses: shaban00/netbird-expose@v1.0.3
   with:
-    port: '3001'
+    port: "3001"
     app-env: ${{ secrets.APP_ENV }}
 ```
 
@@ -90,10 +89,25 @@ jobs:
 services:
   mysql:
     image: mariadb:lts
-    env_file: .env          # <-- required for the vars to reach the container
+    env_file: .env # <-- required for the vars to reach the container
     # ...
   app:
     image: louislam/uptime-kuma:2
     env_file: .env
     # ...
 ```
+
+### Maximum Exposure Duration
+
+Because the service stays exposed for the lifetime of the job (the action holds the job open via `expose-duration`), the upper bound on how long you can expose a service is the GitHub Actions **per-job execution time limit**:
+
+| Runner type          | Max job execution time |
+| -------------------- | ---------------------- |
+| GitHub-hosted        | 6 hours                |
+| Self-hosted          | 5 days                 |
+
+If `expose-duration` (plus your build time) pushes the job past this limit, the job is **terminated and marked as failed** — the exposure ends abruptly rather than tearing down cleanly. Set `expose-duration` comfortably below the ceiling, leaving headroom for image build, the readiness probe, and teardown.
+
+> The whole workflow run is also capped at **35 days** (including waiting and approvals), but for a single-job exposure the per-job limit above is the one you'll hit first.
+
+Source: [GitHub Actions limits](https://docs.github.com/en/actions/reference/limits)
