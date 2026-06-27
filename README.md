@@ -25,7 +25,7 @@ jobs:
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
 
       - name: NetBird Expose
-        uses: shaban00/netbird-expose@v1.0.4
+        uses: shaban00/netbird-expose@v1.0.5
         with:
           port: "8080"
           expose-duration: "30m"
@@ -74,7 +74,7 @@ jobs:
 `.env` files usually aren't committed, so `app-env` lets you hand the action your environment as a secret. Pass a multiline `KEY=VALUE` string (`.env` format, `#` lines ignored)
 
 ```yaml
-- uses: shaban00/netbird-expose@v1.0.3
+- uses: shaban00/netbird-expose@v1.0.5
   with:
     port: "3001"
     app-env: ${{ secrets.APP_ENV }}
