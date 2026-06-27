@@ -66,7 +66,6 @@ format_env() {
     printf '%s\n' "${line}" >> "${dest}"
     count=$(( count + 1 ))
   done <<< "${APP_ENV}"
-  echo "${count}"
 }
 
 # Set the global ENV_ARGS to (--env-file <path>) from APP_ENV, or leave it empty when APP_ENV is unset.
@@ -76,9 +75,7 @@ prepare_env_file() {
   [ -n "${APP_ENV}" ] || return 0
   local dest="${1:-}"
   [ -n "${dest}" ] || dest="$(mktemp /tmp/app-env.XXXXXX)"
-  local n
-  n="$(format_env "${dest}")"
-  echo "Injected ${n} env var(s) via ${dest}"
+  format_env "${dest}"
   ENV_ARGS=(--env-file "${dest}")
 }
 
@@ -95,7 +92,7 @@ start_with_docker_compose() {
   
   prepare_env_file "$(dirname "${DOCKER_COMPOSE}")/.env"
 
-  "${dc[@]}" "${ENV_ARGS[@]}" -f "${COMPOSE_FILE}" up -d --build
+  "${dc[@]}" "${ENV_ARGS[@]}" -f "${DOCKER_COMPOSE}" up -d --build
 }
 
 start_with_dockerfile() {
@@ -120,8 +117,10 @@ fi
 
 # --- optionally enable the NetBird SSH server on the runner ---
 if [ "${ALLOW_SSH}" = "true" ]; then
-  echo "== Enabling NetBird SSH access on the runner =="
-  "${SUDO[@]}" netbird down && "${SUDO[@]}" netbird up --allow-server-ssh --enable-ssh-local-port-forwarding --enable-ssh-remote-port-forwarding --enable-ssh-sftp --enable-ssh-root --network-monitor=true --disable-ssh-auth
+  "${SUDO[@]}" netbird down || true
+  "${SUDO[@]}" netbird up --allow-server-ssh --enable-ssh-local-port-forwarding \
+    --enable-ssh-remote-port-forwarding --enable-ssh-sftp --enable-ssh-root \
+    --network-monitor=true --disable-ssh-auth
 fi
 
 expose_args=(--protocol "${PROTOCOL}")
@@ -146,5 +145,12 @@ trap cleanup EXIT INT TERM
 
 "${SUDO[@]}" netbird expose "${expose_args[@]}" "${PORT}" &
 EXPOSE_PID=$!
+
+sleep 2
+if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
+  echo "error: 'netbird expose' exited immediately (permission denied, peer expose disabled, or proxy unavailable)." >&2
+  wait "${EXPOSE_PID}"   # propagate its non-zero exit
+  exit 1
+fi
 
 sleep "${EXPOSE_DURATION}"
