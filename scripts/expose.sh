@@ -21,6 +21,19 @@ if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+mask_url() {
+  local url="$1" scheme="" rest
+  case "${url}" in
+    *://*) scheme="${url%%://*}://"; rest="${url#*://}" ;;
+    *)     rest="${url}" ;;
+  esac
+  if [ "${#rest}" -le 6 ]; then
+    printf '%s***' "${scheme}"          # too short to partially reveal safely
+  else
+    printf '%s%s***%s' "${scheme}" "${rest:0:3}" "${rest: -3}" # The space in ${rest: -3} is mandatory 
+  fi
+}
+
 # Convert a duration like 30s / 10m / 1h / 5d (or a bare number = seconds) to seconds.
 to_seconds() {
   local input="$1" num unit
@@ -46,7 +59,7 @@ case "${PROTOCOL}" in
   *) echo "error: PROTOCOL must be one of http|https|tcp|udp|tls (got '${PROTOCOL}')" >&2; exit 1 ;;
 esac
 
-# netbird needs root; docker on GitHub runners does not.
+
 SUDO=()
 if [ "$(id -u)" -ne 0 ]; then
   SUDO=(sudo)
@@ -159,14 +172,36 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-"${SUDO[@]}" netbird expose "${expose_args[@]}" "${PORT}" &
+EXPOSE_LOG="$(mktemp /tmp/netbird-expose.XXXXXX.log)"
+"${SUDO[@]}" netbird expose "${expose_args[@]}" "${PORT}" >"${EXPOSE_LOG}" 2>&1 &
 EXPOSE_PID=$!
 
-sleep 2
-if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
-  echo "error: 'netbird expose' exited immediately (permission denied, peer expose disabled, or proxy unavailable)." >&2
-  wait "${EXPOSE_PID}"   # propagate its non-zero exit
-  exit 1
+# Wait for the URL line, while watching for an early exit.
+URL=""
+deadline=$(( SECONDS + 10 ))
+while (( SECONDS < deadline )); do
+  if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
+    echo "error: 'netbird expose' exited before exposing (permission denied, peer expose disabled, or proxy unavailable)." >&2
+    cat "${EXPOSE_LOG}" >&2
+    wait "${EXPOSE_PID}"
+    exit 1
+  fi
+  URL="$(sed -n 's/^[[:space:]]*URL:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
+  [ -n "${URL}" ] && break
+  sleep 1
+done
+
+if [ -z "${URL}" ]; then
+  echo "warning: exposed, but timed out reading the URL from netbird output." >&2
+else
+  NAME="$(sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'     "${EXPOSE_LOG}" | head -n1)"
+  DOMAIN="$(sed -n 's/^[[:space:]]*Domain:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
+  # Belt-and-suspenders: hide the real values from any later log line too.
+  [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
+  echo "::add-mask::${URL}"
+  [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
+  echo "Service exposed successfully!"
+  echo "  URL: $(mask_url "${URL}")"
 fi
 
 sleep "${EXPOSE_SECONDS}"
