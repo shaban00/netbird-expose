@@ -81,8 +81,10 @@ fi
 # --- turn APP_ENV (KEY=VALUE per line, # comments) into a .env file ---
 format_env() {
   local dest="$1" line count=0
-  : > "${dest}"
-  chmod 600 "${dest}" 2>/dev/null || true
+  if [ -e "${dest}" ]; then
+    echo "warning: overwriting existing '${dest}' with app-env values." >&2
+  fi
+  ( umask 077; : > "${dest}" )   # created 0600, no chmod race
   while IFS= read -r line || [ -n "${line}" ]; do
     line="${line%$'\r'}"                       # strip CR from CRLF input
     line="${line#"${line%%[![:space:]]*}"}"    # left-trim whitespace
@@ -99,11 +101,13 @@ format_env() {
 
 # Set the global ENV_ARGS to (--env-file <path>) from APP_ENV, or leave it empty when APP_ENV is unset.
 ENV_ARGS=()
+ENV_FILE=""
 prepare_env_file() {
   ENV_ARGS=()
   [ -n "${APP_ENV}" ] || return 0
   local dest="${1:-}"
   [ -n "${dest}" ] || dest="$(mktemp /tmp/app-env.XXXXXX)"
+  ENV_FILE="${dest}"
   format_env "${dest}"
   ENV_ARGS=(--env-file "${dest}")
 }
@@ -165,11 +169,19 @@ EXPOSE_PID=""
 
 cleanup() {
   if [ -n "${EXPOSE_PID}" ]; then
-    echo "Stopping netbird expose (pid ${EXPOSE_PID})..."
     "${SUDO[@]}" kill -INT "${EXPOSE_PID}" 2>/dev/null || true
     wait "${EXPOSE_PID}" 2>/dev/null || true
   fi
+  # tear down whatever we started
+  if [ -f "${DOCKER_COMPOSE}" ]; then
+    docker compose -f "${DOCKER_COMPOSE}" down >/dev/null 2>&1 || true
+  else
+    docker rm -f netbird-expose >/dev/null 2>&1 || true
+  fi
+  [ -n "${ENV_FILE}" ]     && rm -f "${ENV_FILE}" 2>/dev/null || true
+  [ -n "${EXPOSE_LOG:-}" ] && rm -f "${EXPOSE_LOG}" 2>/dev/null || true
 }
+
 trap cleanup EXIT INT TERM
 
 EXPOSE_LOG="$(mktemp /tmp/netbird-expose.XXXXXX.log)"
@@ -178,7 +190,7 @@ EXPOSE_PID=$!
 
 # Wait for the URL line, while watching for an early exit.
 URL=""
-deadline=$(( SECONDS + 10 ))
+deadline=$(( SECONDS + 60 ))
 while (( SECONDS < deadline )); do
   if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
     echo "error: 'netbird expose' exited before exposing (permission denied, peer expose disabled, or proxy unavailable)." >&2
