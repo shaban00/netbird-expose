@@ -172,14 +172,17 @@ cleanup() {
     "${SUDO[@]}" kill -INT "${EXPOSE_PID}" 2>/dev/null || true
     wait "${EXPOSE_PID}" 2>/dev/null || true
   fi
-  # tear down whatever we started
   if [ -f "${DOCKER_COMPOSE}" ]; then
     docker compose -f "${DOCKER_COMPOSE}" down >/dev/null 2>&1 || true
   else
     docker rm -f netbird-expose >/dev/null 2>&1 || true
   fi
-  [ -n "${ENV_FILE}" ]     && rm -f "${ENV_FILE}" 2>/dev/null || true
-  [ -n "${EXPOSE_LOG:-}" ] && rm -f "${EXPOSE_LOG}" 2>/dev/null || true
+  if [ -n "${ENV_FILE}" ]; then
+    rm -f "${ENV_FILE}" 2>/dev/null || true
+  fi
+  if [ -n "${EXPOSE_LOG:-}" ]; then
+    rm -f "${EXPOSE_LOG}" 2>/dev/null || true
+  fi
 }
 
 trap cleanup EXIT INT TERM
