@@ -62,6 +62,7 @@ jobs:
 | `password`        | no       | `''`                 | Pass from a **secret**.                                                                            |
 | `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                               |
 | `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                                          |
+| `mask-url`        | no       | `true`               | Mask the exposed URL in logs.                                                                      |
 
 ## NetBird side setup
 
