@@ -48,11 +48,11 @@ jobs:
 
       - name: NetBird Connect
         if: steps.gate.outputs.run == 'true'
-        uses: shaban00/netbird-connect@v1.0.0
+        uses: shaban00/netbird-connect@v1.0.2
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
-          hostname: github-runner-${{ github.run_id }}
+          hostname: gh-runner-${{ github.run_id }}
 
       - name: NetBird Expose
         id: expose
@@ -61,4 +61,4 @@ jobs:
         with:
           port: '8080'
           protocol: http
-          expose-duration: '60'
+          expose-duration: '2m'
