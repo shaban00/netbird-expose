@@ -47,10 +47,6 @@ inputs:
   user-groups:
     description: 'Restrict access to specific SSO user groups, comma-separated.'
     required: false
-  allow-ssh:
-    description: 'Enable NetBird SSH access to the runner before exposing. Starts the embedded SSH server with root and no SSH-layer auth, so access is gated only by your NetBird policy. Default false.'
-    required: false
-    default: 'false'
   mask-url:
     description: >-
       Mask the exposed URL in logs (shows only scheme + first/last 3 chars, e.g. https://abc***xyz). Set to false to print the full URL.
@@ -75,6 +71,5 @@ runs:
         PASSWORD: ${{ inputs.password }}
         PIN: ${{ inputs.pin }}
         USER_GROUPS: ${{ inputs.user-groups }}
-        ALLOW_SSH: ${{ inputs.allow-ssh }}
         MASK_URL: ${{ inputs.mask-url }}
       run: bash "${{ github.action_path }}/scripts/expose.sh"

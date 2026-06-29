@@ -19,17 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
       - name: NetBird Connect
-        uses: shaban00/netbird-connect@v1.0.1
+        uses: shaban00/netbird-connect@v1.0.2
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
 
       - name: NetBird Expose
-        uses: shaban00/netbird-expose@v1.0.6
+        uses: shaban00/netbird-expose@v1.0.7
         with:
           port: "8080"
           expose-duration: "30m"
-          app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format   
+          app-env: ${{ secrets.APP_ENV }} # multiline secret, .env format
 ```
 
 ## How it works
@@ -62,7 +62,6 @@ jobs:
 | `password`        | no       | `''`                 | Pass from a **secret**.                                                                            |
 | `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                               |
 | `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                                          |
-| `allow-ssh`       | no       | `false`              | Enable NetBird SSH access to the runner.                                                           |
 
 ## NetBird side setup
 
@@ -74,7 +73,7 @@ jobs:
 `.env` files usually aren't committed, so `app-env` lets you hand the action your environment as a secret. Pass a multiline `KEY=VALUE` string (`.env` format, `#` lines ignored)
 
 ```yaml
-- uses: shaban00/netbird-expose@v1.0.6
+- uses: shaban00/netbird-expose@v1.0.7
   with:
     port: "3001"
     app-env: ${{ secrets.APP_ENV }}
@@ -98,10 +97,10 @@ services:
 
 Because the service stays exposed for the lifetime of the job (the action holds the job open via `expose-duration`), the upper bound on how long you can expose a service is the GitHub Actions **per-job execution time limit**:
 
-| Runner type          | Max job execution time |
-| -------------------- | ---------------------- |
-| GitHub-hosted        | 6 hours                |
-| Self-hosted          | 5 days                 |
+| Runner type   | Max job execution time |
+| ------------- | ---------------------- |
+| GitHub-hosted | 6 hours                |
+| Self-hosted   | 5 days                 |
 
 If `expose-duration` (plus your build time) pushes the job past this limit, the job is **terminated and marked as failed** — the exposure ends abruptly rather than tearing down cleanly. Set `expose-duration` comfortably below the ceiling, leaving headroom for image build, the readiness probe, and teardown.
 

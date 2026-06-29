@@ -14,7 +14,6 @@ NAME_PREFIX="${NAME_PREFIX:-}"
 PASSWORD="${PASSWORD:-}"
 PIN="${PIN:-}"
 USER_GROUPS="${USER_GROUPS:-}"
-ALLOW_SSH="${ALLOW_SSH:-false}"
 MASK_URL="${MASK_URL:-true}"
 
 if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
@@ -149,13 +148,6 @@ else
   start_with_dockerfile
 fi
 
-# --- optionally enable the NetBird SSH server on the runner ---
-if [ "${ALLOW_SSH}" = "true" ]; then
-  "${SUDO[@]}" netbird down || true
-  "${SUDO[@]}" netbird up --allow-server-ssh --enable-ssh-local-port-forwarding \
-    --enable-ssh-remote-port-forwarding --enable-ssh-sftp --enable-ssh-root \
-    --network-monitor=true --disable-ssh-auth
-fi
 
 expose_args=(--protocol "${PROTOCOL}")
 if [ -n "${CUSTOM_DOMAIN}" ]; then expose_args+=(--with-custom-domain "${CUSTOM_DOMAIN}"); fi
