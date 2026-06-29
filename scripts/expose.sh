@@ -15,6 +15,7 @@ PASSWORD="${PASSWORD:-}"
 PIN="${PIN:-}"
 USER_GROUPS="${USER_GROUPS:-}"
 ALLOW_SSH="${ALLOW_SSH:-false}"
+MASK_URL="${MASK_URL:-true}"
 
 if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
   echo "error: PORT must be numeric (got '${PORT}')" >&2
@@ -211,12 +212,15 @@ if [ -z "${URL}" ]; then
 else
   NAME="$(sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'     "${EXPOSE_LOG}" | head -n1)"
   DOMAIN="$(sed -n 's/^[[:space:]]*Domain:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
-  # Belt-and-suspenders: hide the real values from any later log line too.
-  [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
-  echo "::add-mask::${URL}"
-  [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
   echo "Service exposed successfully!"
-  echo "  URL: $(mask_url "${URL}")"
+  if [ "${MASK_URL}" = "true" ]; then
+    [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
+    echo "::add-mask::${URL}"
+    [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
+    echo "  URL: $(mask_url "${URL}")"
+  else
+    echo "  URL: ${URL}"
+  fi
 fi
 
 sleep "${EXPOSE_SECONDS}"
