@@ -14,7 +14,7 @@ NAME_PREFIX="${NAME_PREFIX:-}"
 PASSWORD="${PASSWORD:-}"
 PIN="${PIN:-}"
 USER_GROUPS="${USER_GROUPS:-}"
-ALLOW_SSH="${ALLOW_SSH:-false}"
+MASK_URL="${MASK_URL:-true}"
 
 if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
   echo "error: PORT must be numeric (got '${PORT}')" >&2
@@ -148,13 +148,6 @@ else
   start_with_dockerfile
 fi
 
-# --- optionally enable the NetBird SSH server on the runner ---
-if [ "${ALLOW_SSH}" = "true" ]; then
-  "${SUDO[@]}" netbird down || true
-  "${SUDO[@]}" netbird up --allow-server-ssh --enable-ssh-local-port-forwarding \
-    --enable-ssh-remote-port-forwarding --enable-ssh-sftp --enable-ssh-root \
-    --network-monitor=true --disable-ssh-auth
-fi
 
 expose_args=(--protocol "${PROTOCOL}")
 if [ -n "${CUSTOM_DOMAIN}" ]; then expose_args+=(--with-custom-domain "${CUSTOM_DOMAIN}"); fi
@@ -211,12 +204,15 @@ if [ -z "${URL}" ]; then
 else
   NAME="$(sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'     "${EXPOSE_LOG}" | head -n1)"
   DOMAIN="$(sed -n 's/^[[:space:]]*Domain:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
-  # Belt-and-suspenders: hide the real values from any later log line too.
-  [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
-  echo "::add-mask::${URL}"
-  [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
   echo "Service exposed successfully!"
-  echo "  URL: $(mask_url "${URL}")"
+  if [ "${MASK_URL}" = "true" ]; then
+    [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
+    echo "::add-mask::${URL}"
+    [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
+    echo "  URL: $(mask_url "${URL}")"
+  else
+    echo "  URL: ${URL}"
+  fi
 fi
 
 sleep "${EXPOSE_SECONDS}"
