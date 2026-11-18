@@ -94,7 +94,7 @@ if ! "${SUDO[@]}" netbird status >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! "${SUDO[@]}" netbird status 2>/dev/null | grep -qiE 'Management.*Connected'; then
+if ! grep -qiE 'Management.*Connected' <<< "$("${SUDO[@]}" netbird status 2>/dev/null || true)"; then
   echo "error: runner is not connected to NetBird." >&2
   echo "       Run shaban00/netbird-connect before this action." >&2
   exit 1
@@ -112,7 +112,7 @@ format_env() {
     line="${line#"${line%%[![:space:]]*}"}"    # left-trim whitespace
     [ -z "${line}" ] && continue               # skip blank lines
     case "${line}" in '#'*) continue ;; esac   # skip comments
-    if ! printf '%s' "${line}" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*='; then
+    if ! [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
       echo "warning: skipping an app-env line without a valid KEY= prefix" >&2
       continue
     fi
