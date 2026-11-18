@@ -17,7 +17,7 @@ jobs:
   expose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
       - name: NetBird Connect
         uses: shaban00/netbird-connect@v1.0.2
         with:
@@ -37,7 +37,8 @@ jobs:
 1. Confirms the runner is connected to NetBird (run `netbird-connect` first).
 2. Builds and starts your service — a **docker compose file takes precedence over a Dockerfile** when one exists on disk.
 3. Runs `netbird expose <port>` in the background and reads back the public URL.
-4. Holds the service live for `expose-duration` seconds.
+4. Checks that the service answers through the proxy (http/https), and fails the step if it does not, printing the service's logs.
+5. Holds the service live for `expose-duration`, or with `background: true` finishes the step and keeps it live in the background.
 
 ## Prerequisites
 
@@ -50,7 +51,8 @@ jobs:
 
 | Input             | Required | Default              | Description                                                                                        |
 | ----------------- | -------- | -------------------- | -------------------------------------------------------------------------------------------------- |
-| `port`            | yes      | —                    | Local port the service listens on (the target port to expose).                                     |
+| `port`            | yes      | —                    | Port on the runner to expose. With a Dockerfile it is mapped to `container-port`.                  |
+| `container-port`  | no       | same as `port`       | Port the container listens on (Dockerfile only; a compose file sets its own `ports`).              |
 | `protocol`        | no       | `http`               | One of `http`, `https`, `tcp`, `udp`, `tls`.                                                       |
 | `dockerfile`      | no       | `Dockerfile`         | Dockerfile path. Ignored when a compose file is present.                                           |
 | `docker-compose`  | no       | `docker-compose.yml` | Compose file path. Takes precedence over the Dockerfile when this file exists.                     |
@@ -63,6 +65,32 @@ jobs:
 | `pin`             | no       | `''`                 | 6-digit PIN. Pass from a **secret**.                                                               |
 | `user-groups`     | no       | `''`                 | Comma-separated SSO groups allowed to access the service.                                          |
 | `mask-url`        | no       | `true`               | Mask the exposed URL in logs.                                                                      |
+| `check-timeout`   | no       | `60`                 | Seconds to wait for the service to answer through the proxy (http/https); the step fails otherwise. `0` skips it. |
+| `check-path`      | no       | `/`                  | Path the response check requests, e.g. `/health`.                                                  |
+| `background`      | no       | `false`              | Finish the step and keep the service exposed, so later steps can use the `url` output.             |
+
+## Outputs
+
+| Output   | Description                          |
+| -------- | ------------------------------------ |
+| `url`    | Public URL of the exposed service.   |
+| `name`   | Name of the exposed service.         |
+| `domain` | Domain of the exposed service.       |
+
+Without `background: true`, the step holds the service until `expose-duration` ends, so later steps only see the outputs after teardown. To use the URL (run tests against it, post it in a PR), set `background: true`:
+
+```yaml
+- name: NetBird Expose
+  id: expose
+  uses: shaban00/netbird-expose@<version>
+  with:
+    port: "8080"
+    expose-duration: "15m"
+    background: true
+
+- name: Smoke test
+  run: curl -fsS "${{ steps.expose.outputs.url }}"
+```
 
 ## NetBird side setup
 

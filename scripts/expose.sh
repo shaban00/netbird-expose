@@ -4,6 +4,8 @@ set -euo pipefail
 
 PORT="${PORT:?PORT is required}"
 PROTOCOL="${PROTOCOL:-http}"
+CONTAINER_PORT="${CONTAINER_PORT:-}"
+CHECK_PATH="${CHECK_PATH:-/}"
 DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker-compose.yml}"
 APP_ENV="${APP_ENV:-}"
@@ -15,9 +17,29 @@ PASSWORD="${PASSWORD:-}"
 PIN="${PIN:-}"
 USER_GROUPS="${USER_GROUPS:-}"
 MASK_URL="${MASK_URL:-true}"
+CHECK_TIMEOUT="${CHECK_TIMEOUT:-60}"
+BACKGROUND="${BACKGROUND:-false}"
+
+if ! [[ "${CHECK_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+  echo "error: CHECK_TIMEOUT must be a number of seconds (got '${CHECK_TIMEOUT}')" >&2
+  exit 1
+fi
+case "${BACKGROUND}" in
+  true|false) ;;
+  *) echo "error: BACKGROUND must be true or false (got '${BACKGROUND}')" >&2; exit 1 ;;
+esac
 
 if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
   echo "error: PORT must be numeric (got '${PORT}')" >&2
+  exit 1
+fi
+CONTAINER_PORT="${CONTAINER_PORT:-${PORT}}"
+if ! [[ "${CONTAINER_PORT}" =~ ^[0-9]+$ ]]; then
+  echo "error: CONTAINER_PORT must be numeric (got '${CONTAINER_PORT}')" >&2
+  exit 1
+fi
+if [[ "${CHECK_PATH}" != /* ]]; then
+  echo "error: CHECK_PATH must start with / (got '${CHECK_PATH}')" >&2
   exit 1
 fi
 
@@ -139,7 +161,7 @@ start_with_dockerfile() {
   
   prepare_env_file
 
-  docker run -d --name netbird-expose "${ENV_ARGS[@]}" -p "${PORT}:${PORT}" "${image}"
+  docker run -d --name netbird-expose "${ENV_ARGS[@]}" -p "${PORT}:${CONTAINER_PORT}" "${image}"
 }
 
 if [ -f "${DOCKER_COMPOSE}" ]; then
@@ -160,7 +182,24 @@ if [ -n "${USER_GROUPS}" ];   then expose_args+=(--with-user-groups "${USER_GROU
 
 EXPOSE_PID=""
 
+# Print the service's logs, so a failed step shows why the app did not answer.
+show_logs() {
+  echo "::group::Service logs (last 100 lines)"
+  if [ -f "${DOCKER_COMPOSE}" ]; then
+    docker compose -f "${DOCKER_COMPOSE}" ps -a 2>&1 || true
+    docker compose -f "${DOCKER_COMPOSE}" logs --no-color --tail 100 2>&1 || true
+  else
+    docker ps -a --filter name='^netbird-expose$' 2>&1 || true
+    docker logs --tail 100 netbird-expose 2>&1 || true
+  fi
+  echo "::endgroup::"
+}
+
 cleanup() {
+  local rc=$?
+  if [ "${rc}" -ne 0 ]; then
+    show_logs >&2
+  fi
   if [ -n "${EXPOSE_PID}" ]; then
     "${SUDO[@]}" kill -INT "${EXPOSE_PID}" 2>/dev/null || true
     wait "${EXPOSE_PID}" 2>/dev/null || true
@@ -181,7 +220,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 EXPOSE_LOG="$(mktemp /tmp/netbird-expose.XXXXXX.log)"
-"${SUDO[@]}" netbird expose "${expose_args[@]}" "${PORT}" >"${EXPOSE_LOG}" 2>&1 &
+"${SUDO[@]}" netbird expose "${expose_args[@]}" "${PORT}" </dev/null >"${EXPOSE_LOG}" 2>&1 &
 EXPOSE_PID=$!
 
 # Wait for the URL line, while watching for an early exit.
@@ -200,19 +239,77 @@ while (( SECONDS < deadline )); do
 done
 
 if [ -z "${URL}" ]; then
-  echo "warning: exposed, but timed out reading the URL from netbird output." >&2
+  echo "error: timed out reading the URL from 'netbird expose' output." >&2
+  cat "${EXPOSE_LOG}" >&2
+  exit 1
+fi
+
+NAME="$(sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'     "${EXPOSE_LOG}" | head -n1)"
+DOMAIN="$(sed -n 's/^[[:space:]]*Domain:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
+if [ "${MASK_URL}" = "true" ]; then
+  [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
+  echo "::add-mask::${URL}"
+  [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
+  SHOWN_URL="$(mask_url "${URL}")"
 else
-  NAME="$(sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'     "${EXPOSE_LOG}" | head -n1)"
-  DOMAIN="$(sed -n 's/^[[:space:]]*Domain:[[:space:]]*//p' "${EXPOSE_LOG}" | head -n1)"
-  echo "Service exposed successfully!"
-  if [ "${MASK_URL}" = "true" ]; then
-    [ -n "${NAME}" ]   && echo "::add-mask::${NAME}"
-    echo "::add-mask::${URL}"
-    [ -n "${DOMAIN}" ] && echo "::add-mask::${DOMAIN}"
-    echo "  URL: $(mask_url "${URL}")"
-  else
-    echo "  URL: ${URL}"
+  SHOWN_URL="${URL}"
+fi
+
+# --- check that the service answers through the proxy ---
+# The service must answer with 2xx or 3xx. With a password, PIN or SSO groups
+# the proxy answers with its own login page before the request reaches the
+# service, so then any response below 500 counts. 502/503/504 mean the proxy
+# could not reach the service (wrong port, service not up yet).
+check_url() {
+  local code="" deadline=$(( SECONDS + CHECK_TIMEOUT )) ok='^[23][0-9][0-9]$'
+  if [ -n "${PASSWORD}${PIN}${USER_GROUPS}" ]; then
+    ok='^[1-4][0-9][0-9]$'
   fi
+  while (( SECONDS < deadline )); do
+    if ! kill -0 "${EXPOSE_PID}" 2>/dev/null; then
+      echo "error: 'netbird expose' stopped while checking the service." >&2
+      cat "${EXPOSE_LOG}" >&2
+      return 1
+    fi
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${URL%/}${CHECK_PATH}" || true)"
+    if [[ "${code}" =~ ${ok} ]]; then
+      echo "Service responds through the proxy (HTTP ${code})"
+      return 0
+    fi
+    sleep 3
+  done
+  echo "error: no successful response through the proxy within ${CHECK_TIMEOUT}s at ${CHECK_PATH} (last HTTP status: ${code:-none})." >&2
+  echo "       Check that the service is running (logs below) and listens on the port given (container-port ${CONTAINER_PORT})." >&2
+  return 1
+}
+
+if [ "${CHECK_TIMEOUT}" -gt 0 ]; then
+  case "${PROTOCOL}" in
+    http|https) check_url || exit 1 ;;
+    *) echo "Skipping the response check: it only applies to http and https services." ;;
+  esac
+fi
+
+echo "Service exposed successfully!"
+echo "  URL: ${SHOWN_URL}"
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "url=${URL}"
+    echo "name=${NAME}"
+    echo "domain=${DOMAIN}"
+  } >> "${GITHUB_OUTPUT}"
+fi
+
+if [ "${BACKGROUND}" = "true" ]; then
+  # Hand the service and its teardown to a detached process, so this step ends
+  # and the job's next steps can use the URL while it stays exposed. It is torn
+  # down after expose-duration, or when the job ends, whichever comes first.
+  trap - EXIT INT TERM
+  ( trap cleanup EXIT; sleep "${EXPOSE_SECONDS}" ) </dev/null >/dev/null 2>&1 &
+  disown
+  echo "Exposed in the background for ${EXPOSE_DURATION}; later steps can use the url output."
+  exit 0
 fi
 
 sleep "${EXPOSE_SECONDS}"
