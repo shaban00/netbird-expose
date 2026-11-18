@@ -52,7 +52,7 @@ jobs:
 | Input             | Required | Default              | Description                                                                                        |
 | ----------------- | -------- | -------------------- | -------------------------------------------------------------------------------------------------- |
 | `port`            | yes      | —                    | Port on the runner to expose. With a Dockerfile it is mapped to `container-port`.                  |
-| `container-port`  | no       | same as `port`       | Port the container listens on (Dockerfile only; a compose file sets its own `ports`).              |
+| `container-port`  | no       | same as `port`       | Port the container listens on (Dockerfile only; a compose file sets its own `ports`, with `/udp` for UDP). |
 | `protocol`        | no       | `http`               | One of `http`, `https`, `tcp`, `udp`, `tls`.                                                       |
 | `dockerfile`      | no       | `Dockerfile`         | Dockerfile path. Ignored when a compose file is present.                                           |
 | `docker-compose`  | no       | `docker-compose.yml` | Compose file path. Takes precedence over the Dockerfile when this file exists.                     |
