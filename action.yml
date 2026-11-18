@@ -19,8 +19,11 @@ inputs:
     description: 'Environment variables to inject into the service as KEY=VALUE pairs, one per line (.env format; lines starting with # are ignored).'
     required: false
   port:
-    description: 'Local port the service listens on (the target port to expose).'
+    description: 'Port on the runner to expose. With a Dockerfile it is mapped to container-port.'
     required: true
+  container-port:
+    description: 'Port the container listens on, when it differs from port (Dockerfile only; a compose file sets its own ports). Defaults to port.'
+    required: false
   protocol:
     description: 'Protocol to expose the service over: http | https | tcp | udp | tls.'
     required: false
@@ -52,11 +55,37 @@ inputs:
       Mask the exposed URL in logs (shows only scheme + first/last 3 chars, e.g. https://abc***xyz). Set to false to print the full URL.
     required: false
     default: 'true'
+  check-timeout:
+    description: >-
+      Seconds to wait for the service to answer through the proxy (http and https only). The step fails if it does not. 0 skips the check.
+    required: false
+    default: '60'
+  check-path:
+    description: 'Path requested by the response check, e.g. /health.'
+    required: false
+    default: '/'
+  background:
+    description: >-
+      Keep the service exposed in the background and finish this step, so the job's next steps can use the url output. It is torn down after expose-duration or when the job ends.
+    required: false
+    default: 'false'
+
+outputs:
+  url:
+    description: 'Public URL of the exposed service'
+    value: ${{ steps.expose.outputs.url }}
+  name:
+    description: 'Name of the exposed service'
+    value: ${{ steps.expose.outputs.name }}
+  domain:
+    description: 'Domain of the exposed service'
+    value: ${{ steps.expose.outputs.domain }}
 
 runs:
   using: 'composite'
   steps:
     - name: Expose
+      id: expose
       shell: bash
       env:
         DOCKERFILE: ${{ inputs.dockerfile }}
@@ -64,6 +93,8 @@ runs:
         APP_ENV: ${{ inputs.app-env }}
         PORT: ${{ inputs.port }}
         PROTOCOL: ${{ inputs.protocol }}
+        CONTAINER_PORT: ${{ inputs.container-port }}
+        CHECK_PATH: ${{ inputs.check-path }}
         EXPOSE_DURATION: ${{ inputs.expose-duration }}
         CUSTOM_DOMAIN: ${{ inputs.custom-domain }}
         EXTERNAL_PORT: ${{ inputs.external-port }}
@@ -72,4 +103,6 @@ runs:
         PIN: ${{ inputs.pin }}
         USER_GROUPS: ${{ inputs.user-groups }}
         MASK_URL: ${{ inputs.mask-url }}
+        CHECK_TIMEOUT: ${{ inputs.check-timeout }}
+        BACKGROUND: ${{ inputs.background }}
       run: bash "${{ github.action_path }}/scripts/expose.sh"
