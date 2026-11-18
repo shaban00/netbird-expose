@@ -161,7 +161,11 @@ start_with_dockerfile() {
   
   prepare_env_file
 
-  docker run -d --name netbird-expose "${ENV_ARGS[@]}" -p "${PORT}:${CONTAINER_PORT}" "${image}"
+  # docker publishes TCP unless told otherwise, so a UDP service needs /udp.
+  local publish="${PORT}:${CONTAINER_PORT}"
+  [ "${PROTOCOL}" = "udp" ] && publish+="/udp"
+
+  docker run -d --name netbird-expose "${ENV_ARGS[@]}" -p "${publish}" "${image}"
 }
 
 if [ -f "${DOCKER_COMPOSE}" ]; then

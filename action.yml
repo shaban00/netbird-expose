@@ -19,7 +19,7 @@ inputs:
     description: 'Environment variables to inject into the service as KEY=VALUE pairs, one per line (.env format; lines starting with # are ignored).'
     required: false
   port:
-    description: 'Port on the runner to expose. With a Dockerfile it is mapped to container-port.'
+    description: 'Port on the runner to expose. With a Dockerfile it is mapped to container-port (as UDP when protocol is udp).'
     required: true
   container-port:
     description: 'Port the container listens on, when it differs from port (Dockerfile only; a compose file sets its own ports). Defaults to port.'
