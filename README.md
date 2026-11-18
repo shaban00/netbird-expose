@@ -19,13 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - name: NetBird Connect
-        uses: shaban00/netbird-connect@v1.0.2
+        uses: shaban00/netbird-connect@v1.1.0
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
 
       - name: NetBird Expose
-        uses: shaban00/netbird-expose@v1.0.7
+        uses: shaban00/netbird-expose@v1.1.0
         with:
           port: "8080"
           expose-duration: "30m"
@@ -82,7 +82,7 @@ Without `background: true`, the step holds the service until `expose-duration` e
 ```yaml
 - name: NetBird Expose
   id: expose
-  uses: shaban00/netbird-expose@<version>
+  uses: shaban00/netbird-expose@v1.1.0
   with:
     port: "8080"
     expose-duration: "15m"
@@ -102,7 +102,7 @@ Without `background: true`, the step holds the service until `expose-duration` e
 `.env` files usually aren't committed, so `app-env` lets you hand the action your environment as a secret. Pass a multiline `KEY=VALUE` string (`.env` format, `#` lines ignored)
 
 ```yaml
-- uses: shaban00/netbird-expose@v1.0.7
+- uses: shaban00/netbird-expose@v1.1.0
   with:
     port: "3001"
     app-env: ${{ secrets.APP_ENV }}
